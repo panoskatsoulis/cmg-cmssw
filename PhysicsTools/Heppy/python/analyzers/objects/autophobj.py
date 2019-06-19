@@ -12,6 +12,31 @@ objectInt = NTupleObjectType("builtInType", variables = [
     NTupleVariable("",    lambda x : x,int),
 ])
 
+objectList10Floats = NTupleObjectType("list10Ints", variables = [
+    NTupleVariable("obj"+str(0),    lambda x : x[0] if len(x)>0 else 0),
+    NTupleVariable("obj"+str(1),    lambda x : x[1] if len(x)>1 else 0),
+    NTupleVariable("obj"+str(2),    lambda x : x[2] if len(x)>2 else 0),
+    NTupleVariable("obj"+str(3),    lambda x : x[3] if len(x)>3 else 0),
+    NTupleVariable("obj"+str(4),    lambda x : x[4] if len(x)>4 else 0),
+    NTupleVariable("obj"+str(5),    lambda x : x[5] if len(x)>5 else 0),
+    NTupleVariable("obj"+str(6),    lambda x : x[6] if len(x)>6 else 0),
+    NTupleVariable("obj"+str(7),    lambda x : x[7] if len(x)>7 else 0),
+    NTupleVariable("obj"+str(8),    lambda x : x[8] if len(x)>8 else 0),
+    NTupleVariable("obj"+str(9),    lambda x : x[9] if len(x)>9 else 0)
+])
+objectList10Ints = NTupleObjectType("list10Ints", variables = [
+    NTupleVariable("obj"+str(0),    lambda x : x[0] if len(x)>0 else 0, int),
+    NTupleVariable("obj"+str(1),    lambda x : x[1] if len(x)>1 else 0, int),
+    NTupleVariable("obj"+str(2),    lambda x : x[2] if len(x)>2 else 0, int),
+    NTupleVariable("obj"+str(3),    lambda x : x[3] if len(x)>3 else 0, int),
+    NTupleVariable("obj"+str(4),    lambda x : x[4] if len(x)>4 else 0, int),
+    NTupleVariable("obj"+str(5),    lambda x : x[5] if len(x)>5 else 0, int),
+    NTupleVariable("obj"+str(6),    lambda x : x[6] if len(x)>6 else 0, int),
+    NTupleVariable("obj"+str(7),    lambda x : x[7] if len(x)>7 else 0, int),
+    NTupleVariable("obj"+str(8),    lambda x : x[8] if len(x)>8 else 0, int),
+    NTupleVariable("obj"+str(9),    lambda x : x[9] if len(x)>9 else 0, int)
+])
+
 twoVectorType = NTupleObjectType("twoVector", variables = [
     NTupleVariable("pt",    lambda x : x.pt()),
     NTupleVariable("phi",   lambda x : x.phi()),

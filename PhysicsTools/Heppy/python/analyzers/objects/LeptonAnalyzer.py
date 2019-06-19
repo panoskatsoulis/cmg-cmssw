@@ -176,9 +176,10 @@ class LeptonAnalyzer( Analyzer ):
         inclusiveMuons = []
         inclusiveElectrons = []
         for mu in allmuons:
-            if (mu.track().isNonnull() and mu.muonID(self.cfg_ana.inclusive_muon_id) and 
-                    mu.pt()>self.cfg_ana.inclusive_muon_pt and abs(mu.eta())<self.cfg_ana.inclusive_muon_eta and 
-                    abs(mu.dxy())<self.cfg_ana.inclusive_muon_dxy and abs(mu.dz())<self.cfg_ana.inclusive_muon_dz):
+            # if (mu.track().isNonnull() and mu.muonID(self.cfg_ana.inclusive_muon_id) and 
+            #         mu.pt()>self.cfg_ana.inclusive_muon_pt and abs(mu.eta())<self.cfg_ana.inclusive_muon_eta and 
+            #         abs(mu.dxy())<self.cfg_ana.inclusive_muon_dxy and abs(mu.dz())<self.cfg_ana.inclusive_muon_dz):
+            if ( mu.track().isNonnull() and mu.muonID(self.cfg_ana.inclusive_muon_id) ):
                 inclusiveMuons.append(mu)
         for ele in allelectrons:
             if ( ele.electronID(self.cfg_ana.inclusive_electron_id) and
@@ -188,22 +189,22 @@ class LeptonAnalyzer( Analyzer ):
                 inclusiveElectrons.append(ele)
         event.inclusiveLeptons = inclusiveMuons + inclusiveElectrons
  
-        if self.doMiniIsolation:
-            if self.miniIsolationVetoLeptons == "inclusive":
-                for lep in event.inclusiveLeptons: 
-                    self.IsolationComputer.addVetos(lep.physObj)
-            for lep in event.inclusiveLeptons:
-                self.attachMiniIsolation(lep)
-                for cone_size in self.doDirectionalIsolation:
-                    self.attachDirectionalIsolation(lep,cone_size)
+        # if self.doMiniIsolation:
+        #     if self.miniIsolationVetoLeptons == "inclusive":
+        #         for lep in event.inclusiveLeptons: 
+        #             self.IsolationComputer.addVetos(lep.physObj)
+        #     for lep in event.inclusiveLeptons:
+        #         self.attachMiniIsolation(lep)
+        #         for cone_size in self.doDirectionalIsolation:
+        #             self.attachDirectionalIsolation(lep,cone_size)
 
-        if self.doIsoAnnulus:
-            for lep in event.inclusiveLeptons:
-                self.attachIsoAnnulus04(lep)
+        # if self.doIsoAnnulus:
+        #     for lep in event.inclusiveLeptons:
+        #         self.attachIsoAnnulus04(lep)
 
-        if self.doIsolationScan:
-            for lep in event.inclusiveLeptons:
-                self.attachIsolationScan(lep)
+        # if self.doIsolationScan:
+        #     for lep in event.inclusiveLeptons:
+        #         self.attachIsolationScan(lep)
 
         # make loose leptons (basic selection)
         for mu in inclusiveMuons:
@@ -241,9 +242,9 @@ class LeptonAnalyzer( Analyzer ):
         event.selectedElectrons.sort(key = lambda l : l.pt(), reverse = True)
         event.inclusiveLeptons.sort(key = lambda l : l.pt(), reverse = True)
 
-        for lepton in event.selectedLeptons:
-            if hasattr(self,'efficiency'):
-                self.efficiency.attachToObject(lepton)
+        # for lepton in event.selectedLeptons:
+        #     if hasattr(self,'efficiency'):
+        #         self.efficiency.attachToObject(lepton)
 
     def makeAllMuons(self, event):
         """
@@ -260,8 +261,10 @@ class LeptonAnalyzer( Analyzer ):
         if self.cfg_ana.doSegmentBasedMuonCleaning:
             isgood = cmgMuonCleanerBySegments.clean( self.handles['muons'].product() )
             newmu = []
-            for i,mu in enumerate(allmuons):
-                if isgood[i]: newmu.append(mu)
+            # for i,mu in enumerate(allmuons):
+            #     if isgood[i]: newmu.append(mu)
+            for mu in allmuons:
+                newmu.append(mu)
             allmuons = newmu
 
         # Attach EAs for isolation:
@@ -687,11 +690,11 @@ class LeptonAnalyzer( Analyzer ):
         #call the leptons functions
         self.makeLeptons(event)
 
-        if self.cfg_comp.isMC and self.cfg_ana.do_mc_match:
-            self.matchLeptons(event)
-            self.matchAnyLeptons(event)
-            if self.doMatchToPhotons:
-                self.matchToPhotons(event)
+        # if self.cfg_comp.isMC and self.cfg_ana.do_mc_match:
+        #     self.matchLeptons(event)
+        #     self.matchAnyLeptons(event)
+        #     if self.doMatchToPhotons:
+        #         self.matchToPhotons(event)
             
         return True
 
