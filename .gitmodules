@@ -1,0 +1,3 @@
+[submodule "CMGTools"]
+	path = CMGTools
+	url = git@github.com:vtavolar/cmgtools-lite.git
