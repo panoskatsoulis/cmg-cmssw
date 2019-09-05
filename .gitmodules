@@ -1,3 +1,6 @@
 [submodule "CMGTools"]
 	path = CMGTools
 	url = git@github.com:vtavolar/cmgtools-lite.git
+[submodule "PhysicsTools/NanoAODTools"]
+	path = PhysicsTools/NanoAODTools
+	url = https://github.com/gpetruc/nanoAOD-tools
