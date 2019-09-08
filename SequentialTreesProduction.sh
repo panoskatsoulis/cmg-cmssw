@@ -8,6 +8,7 @@ done
 
 ## env variables
 maxRunningSamples=2
+finished=false
 ## this tool cleans the variables that are used by the script
 function cleanVariables() {
     dogfreq=""
@@ -20,6 +21,7 @@ function cleanVariables() {
     maxRunningSamples=""
     jobsScheduled=""
     jobsFinished=""
+    finished=""
     return 0
 }
 
@@ -54,7 +56,7 @@ function copyCfgHereAndPrepare() {
     return 0
 }
 
-## this tool prepares the next sample of the cfg in line to run (help: prepareNextSample)
+## this tool prepares the next sample of the cfg in line to run, and updates the process variable (help: prepareNextSample)
 function prepareNextSample() {
     sed -i 's/^[^#][ #]+".*".*//' pycfg.py
     sed -i '0,/^##/s/^##//' pycfg.py
@@ -91,10 +93,22 @@ function haddRootFiles() {
     return 0
 }
 
+## this tool calculates in which year is the process that will be submitted next (TO BE FINISHED)
+function findYear() {
+    $(grep "^#*[ #]\+\".*\"\|^[^ ]*if year ==" pycfg.py | sed '/year/{N; s/\n//; q}' | grep year.*year)
+    return 0
+}
+
 
 
 ##########################################################################
 parseOptions $@
-copyCfgHereAndPrepare $pycfg
+[ ! -e $workpath ] && mkdir $workpath
+copyCfgHereAndPrepare $pycfg # this updates $process
+while ! $finished; do
+    condorSubmit $process
+    checkIfAnyFinished $dogfreq
+    haddRootFiles $workpath
+done
 
 exit 0
