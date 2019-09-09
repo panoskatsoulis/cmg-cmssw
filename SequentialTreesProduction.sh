@@ -25,6 +25,28 @@ function cleanVariables() {
     return 0
 }
 
+## handlers for signals
+trap quit SIGINT ## ctrl+c
+trap reconfig SIGINFO ## ctrl+t
+function quit() {
+    echo "The loop stopped, cleanning environment and exiting..."
+    [ -e ./pycfg.py ] && rm -f pycfg.py
+    cleanVariables
+    exit 0
+}
+function reconfig() {
+    printf "Options accessible via this prompt: --dogfreq <freq>, --maxRunningSamples <num>, exit
+input > "
+    read -a args
+    for (( i=0; i<${#args[*]}; i++ )); do
+	[ "${arg[$i]}" == "--dogfreq" ] && { dogfreq=${arg[$i+1]}; continue 2; }
+	[ "${arg[$i]}" == "--maxRunningSamples" ] && { maxRunningSamples=${arg[$i+1]}; continue 2; }
+	[ "${arg[$i]}" == "exit" ] && quit
+    done
+    args=""
+    return
+}
+
 ## this tool parses the options (help: parseOptions <args>)
 function parseOptions() {
     while [ ! -z $1 ]; do
@@ -86,16 +108,22 @@ function haddRootFiles() {
 	jobsScheduled=$(ls $process/*_Chunk* -d | wc | awk '{print $1}')
 	jobsFinished=$(grep "return value 0" $process/*_Chunk*/*log -m 1 | wc | awk '{print $1}')
 	(( $jobsFinished == $jobsScheduled )) && {
-	    hadd $EOS_USER_PATH/sostrees/$year/$(basename $process).root $process/*_Chunk*/*.root
+	    hadd -f -ff $EOS_USER_PATH/sostrees/$year/$(basename $process).root $process/*_Chunk*/*.root
 	    $? && rm -rf $process || echo "hadd failed for process $process. Remove the path manualy."
 	}
     done
     return 0
 }
 
-## this tool calculates in which year is the process that will be submitted next (TO BE FINISHED)
+## this tool calculates in which year is the process that will be submitted next, and echoes it (help: $(findYear))
 function findYear() {
-    $(grep "^#*[ #]\+\".*\"\|^[^ ]*if year ==" pycfg.py | sed '/year/{N; s/\n//; q}' | grep year.*year)
+    occurrences=$(grep "^#*[ #]\+\".*\"\|^[^ ]*if year ==" pycfg.py | sed '/year/{N;N; s/\n//g; q}' | grep "\<year\>" -o | wc | awk '{print $1}')
+    case $occurrences in
+	1) echo "2018" ;;
+	2) echo "2017" ;;
+	3) echo "2016" ;;
+	*) echo "unknown year" ;;
+    esac
     return 0
 }
 
@@ -109,6 +137,9 @@ while ! $finished; do
     condorSubmit $process
     checkIfAnyFinished $dogfreq
     haddRootFiles $workpath
+    prepareNextSample # this updates $process
+    [ $(findYear) != $year ] && finished=true
 done
 
+cleanVariables
 exit 0
