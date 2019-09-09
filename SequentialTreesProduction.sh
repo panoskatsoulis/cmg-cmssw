@@ -48,8 +48,7 @@ function printVariables() {
 }
 
 ## handlers for signals
-trap quit SIGINT ## ctrl+c
-trap reconfig SIGINFO ## ctrl+t
+trap reconfig SIGINT ## ctrl+c
 function quit() {
     echo "The loop stopped, cleanning environment and exiting..."
     [ -e ./pycfg.py ] && rm -f pycfg.py
@@ -61,9 +60,10 @@ function reconfig() {
 input > " > /dev/stderr
     read -a args
     for (( i=0; i<${#args[*]}; i++ )); do
-	[ "${arg[$i]}" == "--dogfreq" ] && { dogfreq=${arg[$i+1]}; continue 2; }
-	[ "${arg[$i]}" == "--maxRunningSamples" ] && { maxRunningSamples=${arg[$i+1]}; continue 2; }
-	[ "${arg[$i]}" == "exit" ] && quit
+	echo "Parging argument ${arg[$i]}..." > /dev/stderr
+	[ "${arg[$i]}" == "--dogfreq" ] && { dogfreq=${arg[$i+1]}; echo "new dogfreq=$dogfreq" > /dev/stderr; continue 2; }
+	[ "${arg[$i]}" == "--maxRunningSamples" ] && { maxRunningSamples=${arg[$i+1]}; echo "new maxRunningSamples=$maxRunningSamples" > /dev/stderr; continue 2; }
+	[ "${arg[$i]}" == "exit" ] && { quit; }
     done
     args=""
     return
@@ -82,11 +82,11 @@ function parseOptions() {
 	return 1
     done
     ## define undefined vars
-    [ -z $pycfg ] && { echo "The cfg is required to be given as input."; return 1; }
-    [ -z $workpath ] && { echo "The workpath path is required to be given as input."; return 1; }
-    [ -z $preprocessor ] && echo "The preprocessor has not been selected, will run the postprocessor."
-    [ -z $year ] && year="2018"
-    [ -z $dogfreq ] && dogfreq="5m"
+    [ -z "$pycfg" ] && { echo "The cfg is required to be given as input."; return 1; }
+    [ -z "$workpath" ] && { echo "The workpath path is required to be given as input."; return 1; }
+    [ -z "$preprocessor" ] && echo "The preprocessor has not been selected, will run the postprocessor."
+    [ -z "$year" ] && year="2018"
+    [ -z "$dogfreq" ] && dogfreq="5m"
     $log && {
 	echo "LOG STARTS HERE:" > SequentialTreesProduction.log
 	printVariables > SequentialTreesProduction.log
@@ -164,7 +164,7 @@ function findYear() {
 
 ##########################################################################
 parseOptions $@
-[ ! -e $workpath ] && mkdir $workpath
+[ -e $workpath ] && rm -r $workpath; mkdir $workpath
 copyCfgHereAndPrepare $pycfg # this updates $process
 while ! $finished; do
     condorSubmit $process
