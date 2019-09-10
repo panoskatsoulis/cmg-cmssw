@@ -9,7 +9,6 @@ done
 ## env variables
 maxRunningSamples=2
 finished=false
-log=false
 ## this tool cleans the variables that are used by the script
 function cleanVariables() {
     dogfreq=""
@@ -56,14 +55,14 @@ function quit() {
     exit 0
 }
 function reconfig() {
-    printf "Options accessible via this prompt: --dogfreq <freq>, --maxRunningSamples <num>, exit
+    printf "\nOptions accessible via this prompt: --dogfreq <freq>, --maxRunningSamples <num>, exit
 input > " > /dev/stderr
     read -a args
     for (( i=0; i<${#args[*]}; i++ )); do
-	echo "Parging argument ${arg[$i]}..." > /dev/stderr
-	[ "${arg[$i]}" == "--dogfreq" ] && { dogfreq=${arg[$i+1]}; echo "new dogfreq=$dogfreq" > /dev/stderr; continue 2; }
-	[ "${arg[$i]}" == "--maxRunningSamples" ] && { maxRunningSamples=${arg[$i+1]}; echo "new maxRunningSamples=$maxRunningSamples" > /dev/stderr; continue 2; }
-	[ "${arg[$i]}" == "exit" ] && { quit; }
+	echo "Parsing argument ${args[$i]}..." > /dev/stderr
+	[ "${args[$i]}" == "--dogfreq" ] && { dogfreq=${args[$i+1]}; echo "new dogfreq=$dogfreq" > /dev/stderr; continue 2; }
+	[ "${args[$i]}" == "--maxRunningSamples" ] && { maxRunningSamples=${args[$i+1]}; echo "new maxRunningSamples=$maxRunningSamples" > /dev/stderr; continue 2; }
+	[ "${args[$i]}" == "exit" ] && { quit; }
     done
     args=""
     return
@@ -85,6 +84,7 @@ function parseOptions() {
     [ -z "$pycfg" ] && { echo "The cfg is required to be given as input."; return 1; }
     [ -z "$workpath" ] && { echo "The workpath path is required to be given as input."; return 1; }
     [ -z "$preprocessor" ] && echo "The preprocessor has not been selected, will run the postprocessor."
+    [ -z "$log" ] && log=false
     [ -z "$year" ] && year="2018"
     [ -z "$dogfreq" ] && dogfreq="5m"
     $log && {
@@ -98,12 +98,12 @@ function parseOptions() {
 function copyCfgHereAndPrepare() {
     [ ! -f $1 ] && { echo "Can't find the cfg $pycfg in $(pwd)."; return 1; }
     cp -a $1 pycfg.py
-    $log && { echo "[$0 $(date)] Copied $1 in $(pwd)" > SequentialTreesProduction.log; }
+    $log && { echo "[copyCfgHereAndPrepare $(date)] Copied $1 in $(pwd)" > SequentialTreesProduction.log; }
     sed -i -r 's@^#*([ #]+".*")@##\1@' pycfg.py ## equal grep command for LHS of sed: grep "^#*[ #]\+\".*\"" pycfg.py
     sed -i 's/.*missing.*//; s/.*FIX.*//; s/.*INVALID.*//' pycfg.py
     sed -i '0,/^##/s/^##//' pycfg.py
     process=$(grep "^#*[ #]\+\".*\"" pycfg.py | grep -v ^## | awk -F '"' '{print $2}')
-    $log && { echo "[$0 $(date)] Uncommented $process" > SequentialTreesProduction.log; }
+    $log && { echo "[copyCfgHereAndPrepare $(date)] Uncommented $process" > SequentialTreesProduction.log; }
     return 0
 }
 
@@ -112,24 +112,26 @@ function prepareNextSample() {
     sed -i 's/^[^#][ #]+".*".*//' pycfg.py
     sed -i '0,/^##/s/^##//' pycfg.py
     process=$(grep "^#*[ #]\+\".*\"" pycfg.py | grep -v ^## | awk -F '"' '{print $2}')
-    $log && { echo "[$0 $(date)] Uncommented $process" > SequentialTreesProduction.log; }
+    $log && { echo "[prepareNextSample $(date)] Uncommented $process" > SequentialTreesProduction.log; }
     return 0
 }
 
 ## this tool runs the nanopy_batch script (help: condorSubmit <process>)
 function condorSubmit() {
-    $log && { echo "[$0 $(date)] Will submit jobs for process $process" > SequentialTreesProduction.log; }
+    $log && { echo "[condorSubmit $(date)] Will submit jobs for process $process" > SequentialTreesProduction.log; }
     nanopy_batch.py -o $workpath/$1 $pycfg --option year=$year $preprocessor -B -b 'run_condor_simple.sh -t 1200 ./batchScript.sh' \
-	&& return 0 \
-	|| return 1
+	&& return 1
+    echo "condorSubmit finished"
+    return 0
 }
 
 ## this tool is a watchdog, checks if any running samples has finished (help: checkIfAnyFinished <dogfreq>)
 function checkIfAnyFinished() {
     while true; do
 	runningSamples=$(condor_q | grep $USER | wc | awk '{print $1}')
+	$log && { echo "[checkIfAnyFinished $(date)] runningSamples = $runningSamples ($maxRunningSamples allowed)." > SequentialTreesProduction.log; }
 	(( $runningSamples < $maxRunningSamples )) && return 0
-	$log && { echo "[$0 $(date)] runningSamples = $runningSamples ($maxRunningSamples allowed). Will sleep..." > SequentialTreesProduction.log; }
+	$log && { echo "[checkIfAnyFinished $(date)] Will sleep..." > SequentialTreesProduction.log; }
 	sleep $1
     done
 }
@@ -143,7 +145,7 @@ function haddRootFiles() {
 	    hadd -f -ff $EOS_USER_PATH/sostrees/$year/$(basename $sample).root $sample/*_Chunk*/*.root
 	    $? && rm -rf $sample || echo "hadd failed for process $process. Remove the path manualy."
 	}
-	$log && { echo "[$0 $(date)] sample $sample, jobsFinished=$jobsFinished | jobsScheduled=$jobsScheduled" > SequentialTreesProduction.log; }
+	$log && { echo "[haddRootFiles $(date)] sample $sample, jobsFinished=$jobsFinished | jobsScheduled=$jobsScheduled" > SequentialTreesProduction.log; }
     done
     return 0
 }
@@ -163,14 +165,14 @@ function findYear() {
 
 
 ##########################################################################
-parseOptions $@
+parseOptions $@ || { echo "parseOptions returned $?"; exit 1; }
 [ -e $workpath ] && rm -r $workpath; mkdir $workpath
-copyCfgHereAndPrepare $pycfg # this updates $process
+copyCfgHereAndPrepare $pycfg || { echo "copyCfgHereAndPrepare returned $?"; exit 1; } # this updates $process
 while ! $finished; do
-    condorSubmit $process
+    condorSubmit $process || { echo "condorSubmit returned $?" > /dev/null; exit 1; }
     checkIfAnyFinished $dogfreq
     haddRootFiles $workpath
-    prepareNextSample # this updates $process
+    prepareNextSample
     yearFound=$(findYear)
     [ $yearFound != $year ] && finished=true
     $log && { echo "[in loop $(date)] yearFound=$yearFound, finished=$finished" > SequentialTreesProduction.log; }
