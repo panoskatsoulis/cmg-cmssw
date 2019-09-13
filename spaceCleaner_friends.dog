@@ -1,0 +1,71 @@
+#!/bin/bash
+
+## help
+function _help() {
+    printf "Usage $(basename $0) <chunks-path> <eos-path>\n\n"; exit 0;
+}
+for arg in ${@}; do
+    { [ "$arg" == "--help" ] || [ "$arg" == "-h" ] || [ "$arg" == "-help" ]; } && _help
+done
+
+## env variables
+input=$1
+output=$2
+dogfreq=10m
+quotaThreshold=80
+finishedBefore=0
+{ [ -z $input ] || [ -z $output ]; } && _help
+
+## signal handler
+trap prompt SIGINT # #ctrl+c
+function prompt() {
+    printf "\nOptions accessible via this prompt: --dogfreq <freq>, --quota-threshold <threshold>, quota, exit
+input > " > /dev/stderr
+    read -a args
+    for (( i=0; i<${#args[*]}; i++ )); do
+	[ "${args[$i]}" == "--dogfreq" ] && { dogfreq=${args[$i+1]}; echo "new dogfreq=$dogfreq" > /dev/stderr; continue 2; }
+	[ "${args[$i]}" == "--quota-threshold" ] && { quotaThreshold=${args[$i+1]}; echo "new quotaThreshold=$quotaThreshold" > /dev/stderr; continue 2; }
+	[ "${args[$i]}" == "quota" ] && { fs quota > /dev/stderr; continue; }
+	[ "${args[$i]}" == "exit" ] && exit 0
+    done
+    args=""
+    return
+}
+
+## this tool returns if find that more jobs have finished its previous check
+## help: checkIfJobsFinished <dogfreq>
+function checkIfJobsFinished() {
+    while true; do
+	finishedJobs=$(condor_q | grep $USER | awk 'BEGIN{sum=0};{sum+=$6};END{print sum}')
+	(( $finishedJobs < $finishedBefore )) && return 0
+	finishedBefore=$finishedJobs
+	sleep $1
+    done
+}
+
+## this tools checks in the log files of the chunks and if they're done it copies them to eos
+## help: moveFinishedToEOS <chunksPath> <eosPath>
+function moveFinishedToEOS() {
+    chunksPath=$1
+    eosPath=$2
+    for chunkLog in $(ls $chunksPath/log*); do
+	grep 'return value 0' $chunksPath/logs/$chunkLog > /dev/null && {
+	    chunkFile=$(echo $chunkLog | awk -F '.' '{print $3"_Friend.chunk"$4".root"}')
+	    echo "Finished chunk found. $chunkFile"
+	    mv $chunksPath/$chunkFile $eosPath/.
+	}
+    done
+    return 0
+}
+
+
+
+##############################################################################################
+
+while true; do
+    ## checkIfJobsFinished $dogfreq
+    quota=$(fs quota | awk '{print $1}' | sed s/%//); echo "Current afs-quota ${quota}% (action to be taken after ${quotaThreshold}%)"
+    (( $quota > $quotaThreshold )) && moveFinishedToEOS $input $output
+    echo "Will sleep for $dogfreq"
+    sleep $dogfreq
+done

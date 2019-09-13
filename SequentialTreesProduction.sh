@@ -25,6 +25,7 @@ function cleanVariables() {
     sample=""
     yearFound=""
     finished=""
+    _source=""
     return 0
 }
 ## this tool print all variables that are used by the script
@@ -43,6 +44,7 @@ function printVariables() {
     echo "sample=$sample"
     echo "yearFound=$yearFound"
     echo "finished=$finished"
+    echo "_source=$_source"
     return 0
 }
 
@@ -77,9 +79,12 @@ function parseOptions() {
 	[ "$1" == "--workpath" ] && { workpath=$2; shift 2; continue; }
 	[ "$1" == "--preprocessor" ] && { preprocessor="--option nanoPreProcessor"; shift; continue; }
 	[ "$1" == "--log" ] && { log=true; shift; continue; }
+	[ "$1" == "--source" ] && { _source=true; shift; continue; }
 	echo "Unknown option $1"
 	return 1
     done
+    ## return if is source
+    $_source && return 0
     ## define undefined vars
     [ -z "$pycfg" ] && { echo "The cfg is required to be given as input."; return 1; }
     [ -z "$workpath" ] && { echo "The workpath path is required to be given as input."; return 1; }
@@ -165,7 +170,7 @@ function findYear() {
 
 
 ##########################################################################
-parseOptions $@ || { echo "parseOptions returned $?"; exit 1; }
+parseOptions $@ || { echo "parseOptions returned $?"; exit 1; }; $_source && return 0
 [ -e $workpath ] && rm -r $workpath; mkdir $workpath
 copyCfgHereAndPrepare $pycfg || { echo "copyCfgHereAndPrepare returned $?"; exit 1; } # this updates $process
 while ! $finished; do
@@ -179,4 +184,4 @@ while ! $finished; do
 done
 
 cleanVariables
-exit 0
+
