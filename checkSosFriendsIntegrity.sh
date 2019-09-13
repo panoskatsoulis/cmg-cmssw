@@ -73,6 +73,6 @@ done
     printf "Continue? [y/n]"; read ans
     ! [ -e $friendsToCheck/completed ] && mkdir $friendsToCheck/completed
     [ "$ans" == 'y' ] && \
-	for file in $completedTrees; do mv $file $friendsToCheck/completed/.; done    
+	for file in $completedTrees; do mv $file $friendsToCheck/completed/.; done
 }
 exit 0
