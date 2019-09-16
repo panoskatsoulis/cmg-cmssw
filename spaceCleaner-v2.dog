@@ -34,14 +34,15 @@ input > " > /dev/stderr
 }
 
 ## this tool returns if find that more jobs have finished its previous check
-## help: checkIfJobsFinished <dogfreq>
-function checkIfJobsFinished() {
-    while true; do
-	finishedJobs=$(condor_q | grep $USER | awk 'BEGIN{sum=0};{sum+=$6};END{print sum}')
-	(( $finishedJobs < $finishedBefore )) && return 0
-	finishedBefore=$finishedJobs
-	sleep $1
-    done
+## help: checkIfJobsFinished <task-dir>
+function ifTaskFinished() {
+    taskDir=$1
+    logFiles=$(ls $taskDir/*Chunk*/*log) # get the files
+    taskLogs=$(echo $logFiles | tr ' ' '\n' | wc | awk '{print $1}') # count them
+    jobsFinished=$(grep -o "return value 0" $logsFiles | wc | awk '{print $1}') # count in how many of them, 0 return value is reported
+    (( $taskLogs == $jobsFinished )) && \
+	return 0 || \
+	return 1
 }
 
 ## this tools checks in the log files of the chunks and if they're done it copies them to eos
@@ -63,9 +64,9 @@ function moveFinishedToEOS() {
 ##############################################################################################
 
 while true; do
-    ## checkIfJobsFinished $dogfreq
     quota=$(fs quota | awk '{print $1}' | sed s/%//); echo "Current afs-quota ${quota}% (action to be taken after ${quotaThreshold}%)"
     (( $quota > $quotaThreshold )) && moveFinishedToEOS $input $output
+    ifJobsFinished $task && break
     echo "Will sleep for $dogfreq"
     sleep $dogfreq
 done

@@ -2,6 +2,7 @@
 
 function dohelp() { printf "Usage: $(basename $0) --friends-path <dir>\n\n"; exit 0; }
 
+[ "${#@}" == "0" ] && dohelp
 for arg in "$@"; do
     { [[ $arg =~ \-{,2}help ]] || [ "$1" == "-h" ]; } && dohelp
     [ "$arg" == "--debug" ] && { set -x; shift; continue; }
@@ -20,13 +21,13 @@ for sample in $samples; do
 	# get the return value
 	info="$info$(grep "return value [0-9]*" $chunklog -o)  #  "
 	# get the root files
-	info="$info$(find $friendsToCheck -maxdepth 1 | grep $sample.*chunk$(echo $chunklog | grep [0-9]*$ -o).root)"
+	info="$info$(find $friendsToCheck -maxdepth 1 | grep ${sample}_.*chunk$(echo $chunklog | grep [0-9]*$ -o).root)"
 	#print the line
 	printf "$info\n\n"
     done
 
     ## Getting info for the chunks
-    rootFiles=$(find $friendsToCheck -maxdepth 1 | grep $sample.*chunk)
+    rootFiles=$(find $friendsToCheck -maxdepth 1 | grep ${sample}_.*chunk); echo "------------------"; echo "$rootFiles"
     [ -z "$rootFiles" ] && continue # this happens when the sample consists of only one chunk
     targetFileName=$(ls $rootFiles | sed -r 's/\.chunk[0-9]*(\.root)/\1/' | sort -u)
     [ "$(echo $targetFileName | tr ' ' '\n' | wc | awk '{print $1}')" != "1" ] && {
