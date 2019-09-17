@@ -36,9 +36,24 @@ $FRIENDS_ONLY && IN_TREES_DIR=$4
 EOS_PATH=$EOS_USER_PATH/sostrees/2018/$TASK_NAME-$(date | awk '{print $3$2$6}')
 [ -z $IN_TREES_DIR ] && IN_TREES_DIR=$EOS_PATH/trees
 SPACE_CLEANER=$CMSSW_DIR/spaceCleaner-v2.dog
-py_FTREES=$CMSSW_DIR/CMGTools/TTHAnalysis/macros/prepareEventVariablesFriendTree.py
+py_FTREES=prepareEventVariablesFriendTree.py
+tthanalysis_macro_PATH=$CMSSW_DIR/CMGTools/TTHAnalysis/macros
 friends_dir=friends
 $FRIENDS_ONLY && friends_dir=friends-$(date | awk '{print $3$2$6}')
+
+## clean existing working paths if the user allows
+## Usage: checkRmPath <dir>
+function checkRmPath() {
+    DIR2RM=$1
+    [ -e $DIR2RM ] && {
+	ans=''
+	while ! [[ $ans =~ [yn] ]]; do printf "The working path $DIR2RM exists, want to remove it? [y/n]"; read ans; done
+	[ "$ans" == "y" ] && rm -rf $DIR2RM
+    }
+    return
+}
+checkRmPath $EOS_PATH
+checkRmPath $IN_TREES_DIR/$friends_dir
 
 ## setup the required directories
 mkdir $EOS_PATH/postprocessor_chunks -p
@@ -75,7 +90,7 @@ function wait_friendsModule() {
     while true; do
 	job_logs=$(ls $DIR/logs/log.* | wc | awk '{print $1}')
 	jobs_finished=$(grep -o "return value 0" $DIR/logs/log.* | wc | awk '{print $1}')
-	root_files=$(ls $DIR/*chunk*.root | wc | awk '{print $1}')
+	root_files=$(ls $DIR/*.root | wc | awk '{print $1}')
 	if (( $job_logs == $jobs_finished )) && (( $jobs_logs == $root_files )); then
 	    return 0
 	elif (( $job_logs == $jobs_finished )) && (( $jobs_logs > $root_files )); then
@@ -83,7 +98,7 @@ function wait_friendsModule() {
 	    echo "All jobs included in $DIR finished, but the number of the produced root files is less than the jobs run."
 	    return 1
 	else
-	    jobs_failed=$(grep -o "return value [1-9]*" $DIR/logs/log.* | wc | awk '{print $1}')
+	    jobs_failed=$(grep -o "return value [1-9]+" $DIR/logs/log.* | wc | awk '{print $1}')
 	    (( $jobs_failed > 0 )) && echo "[ WARNING ] $jobs_failed have failed in directory $DIR"
 	    sleep 5m
 	fi
@@ -106,26 +121,28 @@ function haddProcesses() {
 }
 
 ## run the friend tree modules
+cd $tthanalysis_macro_PATH && echo "$PWD"
 if [ $TASK_TYPE == "data" ]; then
-    python $py_FTREES -t NanoAOD $IN_TREES_DIR $TASK_TYPE/friends_chunks -D '.*Run.*' -I CMGTools.TTHAnalysis.tools.nanoAOD.susySOS_modules recleaner_step1,recleaner_step2_data,tightLepCR_seq -N 500000 -q condor --maxruntime 240
+    python $py_FTREES -t NanoAOD $IN_TREES_DIR $CMSSW_DIR/$TASK_NAME/friends_chunks -D '.*Run.*' -I CMGTools.TTHAnalysis.tools.nanoAOD.susySOS_modules recleaner_step1,recleaner_step2_data,tightLepCR_seq -N 500000 -q condor --maxruntime 240
 
-    wait_friendsModule $TASK_TYPE/friends_chunks
-    $? && haddProcesses $TASK_TYPE/friends_chunks $IN_TREES_DIR/friends || exit 1
+    wait_friendsModule $CMSSW_DIR/$TASK_NAME/friends_chunks
+    $? && haddProcesses $CMSSW_DIR/$TASK_NAME/friends_chunks $IN_TREES_DIR/friends || exit 1
 
 elif [ $TASK_TYPE == "mc" ]; then
-    python $py_FTREES -t NanoAOD $IN_TREES_DIR $TASK_TYPE/jetmetUncertainties_chunks -D '^(?!.*Run).*' -I CMGTools.TTHAnalysis.tools.nanoAOD.susySOS_modules jetmetUncertainties2018 -N 500000 -q condor --maxruntime 240
+    python $py_FTREES -t NanoAOD $IN_TREES_DIR $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks -D '^(?!.*Run).*' -I CMGTools.TTHAnalysis.tools.nanoAOD.susySOS_modules jetmetUncertainties2018 -N 500000 -q condor --maxruntime 240
 
-    wait_friendsModule $TASK_TYPE/jetmetUncertainties_chunks
-    $? && haddProcesses $TASK_TYPE/jetmetUncertainties_chunks $IN_TREES_DIR/$friends_dir/jetmetUncertainties || exit 1
+    wait_friendsModule $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks
+    $? && haddProcesses $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks $IN_TREES_DIR/$friends_dir/jetmetUncertainties || exit 1
 
-    python $py_FTREES -t NanoAOD $IN_TREES_DIR $TASK_TYPE/friends_chunks -D '^(?!.*Run).*' -F $IN_TREES_DIR/$friends_dir/jetmetUncertainties/{cname}_Friend.root Friends -I CMGTools.TTHAnalysis.tools.nanoAOD.susySOS_modules recleaner_step1,recleaner_step2_mc,tightLepCR_seq -N 500000 -q condor --maxruntime 240
+    python $py_FTREES -t NanoAOD $IN_TREES_DIR $CMSSW_DIR/$TASK_NAME/friends_chunks -D '^(?!.*Run).*' -F $IN_TREES_DIR/$friends_dir/jetmetUncertainties/{cname}_Friend.root Friends -I CMGTools.TTHAnalysis.tools.nanoAOD.susySOS_modules recleaner_step1,recleaner_step2_mc,tightLepCR_seq -N 500000 -q condor --maxruntime 240
 
-    wait_friendsModule $TASK_TYPE/friends_chunks
-    $? && haddProcesses $TASK_TYPE/friends_chunks $IN_TREES_DIR/friends || exit 1
+    wait_friendsModule $CMSSW_DIR/$TASK_NAME/friends_chunks
+    $? && haddProcesses $CMSSW_DIR/$TASK_NAME/friends_chunks $IN_TREES_DIR/friends || exit 1
 
 else
     echo "TASK_TYPE is neither 'data' nor 'mc'"
     exit 1
 fi
 
+cd -
 exit 0
