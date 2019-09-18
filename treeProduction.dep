@@ -1,0 +1,70 @@
+#!/bin/bash
+
+## tool that asks the user if wants to remove the given directory
+## Usage: checkRmPath <dir>
+function checkRmPath() {
+    DIR2RM=$1
+    [ -e $DIR2RM ] && {
+	ans=''
+	while ! [[ $ans =~ [yn] ]]; do printf "The working path $DIR2RM exists, want to remove it? [y/n]"; read ans; done
+	[ "$ans" == "y" ] && rm -rf $DIR2RM
+    }
+    return
+}
+
+## tool that checks if the friend trees module finished
+## Usage: wait_friendsModule <output-dir> <sleep-freq>
+function wait_friendsModule() {
+    DIR=$1
+    FREQ=$2
+    while true; do
+	jobs_logs=$(ls $DIR/logs/log.* | wc | awk '{print $1}')
+	jobs_finished=$(grep -o "return value 0" $DIR/logs/log.* | wc | awk '{print $1}')
+	root_files=$(ls $DIR/*.root | wc | awk '{print $1}')
+	echo "jobs_logs=$jobs_logs, jobs_finished=$jobs_finished, root_files=$root_files"
+	echo "logs = finished : $(( $jobs_logs == $jobs_finished ))"
+	echo "logs = files    : $(( $jobs_logs == $root_files ))"
+	echo "logs > files    : $(( $jobs_logs > $root_files ))"
+	if (( $jobs_logs == $jobs_finished )) && (( $jobs_logs == $root_files )); then
+	    echo "true is (( $jobs_logs == $jobs_finished )) && (( $jobs_logs == $root_files ))"
+	    return 0
+	elif (( $jobs_logs == $jobs_finished )) && (( $jobs_logs > $root_files )); then
+	    echo "true is (( $jobs_logs == $jobs_finished )) && (( $jobs_logs > $root_files ))"
+	    echo "[ ERROR ]"
+	    echo "All jobs included in $DIR finished, but the number of the produced root files is less than the jobs run."
+	    return 1
+	else
+	    echo "none is true"
+	    jobs_failed=$(grep -o "return value [1-9]+" $DIR/logs/log.* | wc | awk '{print $1}')
+	    (( $jobs_failed > 0 )) && echo "[ WARNING ] $jobs_failed have failed in directory $DIR"
+	    sleep $FREQ
+	fi
+    done
+}
+
+## tool that hadds all processes in a given path and stores them wherever specified
+## Usage: haddProcesses <in-dir> <out-dir>
+function haddProcesses() {
+    IN_DIR=$1
+    OUT_DIR=$2
+    ## loop over processes which split into more than 1 chunk
+    processes=$(ls $IN_DIR/*root | sed -r 's@^.*/([^/\.]*).*[Cc]hunk[0-9]*\.root$@\1@; /chunk/d' | sort -u)
+    for process in $processes; do
+	chunks=$(ls $IN_DIR/$process.chunk*.root | wc | awk '{print $1}')
+	(( $chunks == 0 )) && {
+	    cp -a $IN_DIR/$process.root $OUT_DIR/$process.root || echo "$IN_DIR/$process is missing" >> errors_treeProduction
+	    continue
+	}
+	hadd -ff $OUT_DIR/$process.root $IN_DIR/$process.chunk*.root || {
+	    echo "hadd failed for path $IN_DIR and process $process"
+	    return 1
+	}
+    done
+    ## copy the files from processes which split in 1 chunk
+    files=$(ls $IN_DIR/*root | sed -r 's@^.*/([^/\.]*).*[Cc]hunk[0-9]*\.root$@\1@' | grep .*root$)
+    for file in $files; do
+	cp -a $file $OUT_DIR/.
+    done
+    return 0
+}
+
