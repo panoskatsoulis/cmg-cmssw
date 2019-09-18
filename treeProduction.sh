@@ -1,7 +1,7 @@
 #!/bin/bash
 [[ $1 =~ \-+help ]] && {
-    echo "Usage: $(basename $0) <py-cfg> <task-name> <data/mc>                          (Full Production Mode)"
-    echo "Usage: $(basename $0) --friends-only <task-name> <data/mc> <in-trees-dir>     (Friends Only Production Mode)"
+    echo "Usage: $(basename $0) <py-cfg> <task-name> <data/mc>                                         (Full Production Mode)"
+    echo "Usage: $(basename $0) --friends-only <task-name> <data/mc> <in-trees-dir> [--skip-jetCorrs]  (Friends Only Production Mode)"
     printf "Directory Structure (Full Production):
 EOS_PATH --+-- postprocessor_chunks
            |-- friends_chunks
@@ -30,6 +30,7 @@ IN_TREES_DIR=""
 TASK_NAME=$2
 TASK_TYPE=$3 ## either 'data' or 'mc'
 $FRIENDS_ONLY && IN_TREES_DIR=$4 
+[ "$5" == "--skip-jetCorrs" ] && SKIP_JETCORRS=true || SKIP_JETCORRS=false
 
 ## setup environment
 ! [ -z $CMSSW_BASE ] && CMSSW_DIR=$CMSSW_BASE/src || { echo "do cmsenv"; exit 1; }
@@ -40,7 +41,8 @@ py_FTREES=prepareEventVariablesFriendTree.py
 tthanalysis_macro_PATH=$CMSSW_DIR/CMGTools/TTHAnalysis/macros
 friends_dir=friends
 $FRIENDS_ONLY && friends_dir=friends-$(date | awk '{print $3$2$6}')
-N_EVENTS=50000 # 500000
+N_EVENTS=25000 # 500000
+freq=2m
 
 ## clean existing working paths if the user allows
 ## Usage: checkRmPath <dir>
@@ -109,7 +111,7 @@ function wait_friendsModule() {
 	    echo "none is true"
 	    jobs_failed=$(grep -o "return value [1-9]+" $DIR/logs/log.* | wc | awk '{print $1}')
 	    (( $jobs_failed > 0 )) && echo "[ WARNING ] $jobs_failed have failed in directory $DIR"
-	    sleep 5m
+	    sleep $freq
 	fi
     done
 }
@@ -118,10 +120,15 @@ function wait_friendsModule() {
 ## Usage: haddProcesses <in-dir> <out-dir>
 function haddProcesses() {
     IN_DIR=$1
-    OUT_DIR=$1
-    processes=$(ls $IN_DIR/*root | sed -r 's@^.*/([^/\.]*).*[Cc]hunk[0-9]*.*root$@\1@' | sort -u)
+    OUT_DIR=$2
+    processes=$(ls $IN_DIR/*root | sed -r 's@^.*/([^/\.]*).*[Cc]hunk[0-9]*\.root$@\1@; /chunk/d' | sort -u)
     for process in $processes; do
-	hadd $OUT_DIR/$process.root $IN_DIR/$process.chunk*.root || {
+	chunks=$(ls $IN_DIR/$process.chunk*.root | wc | awk '{print $1}')
+	(( $chunks == 0 )) && {
+	    cp -a $IN_DIR/$process.root $OUT_DIR/$process.root || echo "$IN_DIR/$process is missing" >> errors_treeProduction
+	    continue
+	}
+	hadd -ff $OUT_DIR/$process.root $IN_DIR/$process.chunk*.root || {
 	    echo "hadd failed for path $IN_DIR and process $process"
 	    return 1
 	}
@@ -139,12 +146,16 @@ if [ $TASK_TYPE == "data" ]; then
 	|| exit 1
 
 elif [ $TASK_TYPE == "mc" ]; then
-    python $py_FTREES -t NanoAOD $IN_TREES_DIR $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks -D '^(?!.*Run).*' -I CMGTools.TTHAnalysis.tools.nanoAOD.susySOS_modules jetmetUncertainties2018 -N $N_EVENTS -q condor --maxruntime 240 --batch-name $TASK_NAME-mc_jetcorrs
+    ! $SKIP_JETCORRS && {
+	python $py_FTREES -t NanoAOD $IN_TREES_DIR $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks -D '^(?!.*Run).*' -I CMGTools.TTHAnalysis.tools.nanoAOD.susySOS_modules jetmetUncertainties2018 -N $N_EVENTS -q condor --maxruntime 240 --batch-name $TASK_NAME-mc_jetcorrs
 
-    wait_friendsModule $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks \
-	&& haddProcesses $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks $IN_TREES_DIR/$friends_dir/jetmetUncertainties \
-	|| exit 1
+	wait_friendsModule $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks \
+	    && haddProcesses $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks $IN_TREES_DIR/$friends_dir/jetmetUncertainties \
+	    || exit 1
+    }
 
+    echo "Files in the directory $IN_TREES_DIR/$friends_dir/jetmetUncertainties:"
+    ls $IN_TREES_DIR/$friends_dir/jetmetUncertainties
     python $py_FTREES -t NanoAOD $IN_TREES_DIR $CMSSW_DIR/$TASK_NAME/friends_chunks -D '^(?!.*Run).*' -F $IN_TREES_DIR/$friends_dir/jetmetUncertainties/{cname}_Friend.root Friends -I CMGTools.TTHAnalysis.tools.nanoAOD.susySOS_modules recleaner_step1,recleaner_step2_mc,tightLepCR_seq -N $N_EVENTS -q condor --maxruntime 240 --batch-name $TASK_NAME-mc
 
     wait_friendsModule $CMSSW_DIR/$TASK_NAME/friends_chunks \
