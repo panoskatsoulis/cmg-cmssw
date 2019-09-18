@@ -1,5 +1,49 @@
 #!/bin/bash
 
+function do_treeProd_help() {
+    printf "Usage: $(basename $0) --task <task-name> --type <data/mc> --year <year> -in <cfg.py> -out <dir>                   (Full Production Mode)
+Usage: $(basename $0) --friends-only --task <task-name> --type <data/mc> --year <year> -in <trees-dir> -out <dir> (Friends Only Mode)
+Options:
+    --task <arg>         : Task name
+    --type <arg>         : data/mc, configs the recleaner
+    --year <arg>         : 2016,2017,2018
+    --input, -in <arg>   : Input to the script as described above (file or dir)
+    --output, -out <arg> : Output directory to store products (hadd'ed)
+    --events <arg>       : Maximum events per chunk
+    --freq <arg>         : Check frequency for the watchdogs
+    --friends-only       : Enables the Friends Only mode
+    --skip-jetCorrs      : Skips the calculation of the jetMetCorrections,
+                           needs to setup correctly the 'input' argument
+                           {one (1) level above the jetmet directory}
+    --debug              : Runs 'set -x' (super verbosive)
+"
+    [ "$1" == "all" ] && {
+	printf "Local afs directories:
+SRC/TASK --+-- postprocessor_chunks
+           |-- friends_chunks
+           +-- jetmetUncertainties_chunks
+"
+	printf "Output directories Structure (Full Production):
+OUT_PATH/YEAR/TASK_NAME --+-- postprocessor_chunks
+                          |-- friends_chunks
+                          +-- jetmetUncertainties_chunks
+                          +-- trees --+-- <trees>.root
+                                      +-- friends --+-- <ftrees>.root
+                                                    +-- jetmetUncertainties --+-- <jetmet-trees>.root
+"
+	printf "Output directories Structure (Friends Only):
+OUT_PATH/YEAR/TASK_NAME --+-- postprocessor_chunks
+                          |-- friends_chunks
+                          +-- jetmetUncertainties_chunks
+
+"
+    } || {
+	echo "Run $(basename $0) -h all for information about the directories."
+    }
+    exit 0
+}
+
+
 ## tool that asks the user if wants to remove the given directory
 ## Usage: checkRmPath <dir>
 function checkRmPath() {
