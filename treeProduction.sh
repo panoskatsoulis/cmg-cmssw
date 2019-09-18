@@ -1,8 +1,8 @@
 #!/bin/bash
 [[ $1 =~ \-+help ]] && {
-    echo "Usage: $(basename $0) <py-cfg> <task-name> <data/mc>                                         (Full Production Mode)"
-    echo "Usage: $(basename $0) --friends-only <task-name> <data/mc> <in-trees-dir> [--skip-jetCorrs]  (Friends Only Production Mode)"
-    printf "Directory Structure (Full Production):
+    echo "Usage: $(basename $0) <py-cfg> <task-name> <data/mc> <year>                                         (Full Production Mode)"
+    echo "Usage: $(basename $0) --friends-only <task-name> <data/mc> <year> <in-trees-dir> [--skip-jetCorrs]  (Friends Only Production Mode)"
+    printf "Directories Structure (Full Production):
 EOS_PATH --+-- postprocessor_chunks
            |-- friends_chunks
            |-- jetmetUncertainties_chunks
@@ -10,8 +10,8 @@ EOS_PATH --+-- postprocessor_chunks
                        +-- friends --+-- <ftrees>.root
                                      +-- jetmetUncertainties --+-- <jetmet-trees>.root
 "
-    printf "Directory Structure (Friends Only):
-EOS_PATH --+-- postprocessor_chunks
+    printf "Directories Structure (Friends Only):
+SRC_TASK --+-- postprocessor_chunks
            |-- friends_chunks
            +-- jetmetUncertainties_chunks
 
@@ -29,8 +29,9 @@ IN_TREES_DIR=""
 [ "$1" == "--friends-only" ] && FRIENDS_ONLY=true || py_CFG=$PWD/$1
 TASK_NAME=$2
 TASK_TYPE=$3 ## either 'data' or 'mc'
-$FRIENDS_ONLY && IN_TREES_DIR=$4 
-[ "$5" == "--skip-jetCorrs" ] && SKIP_JETCORRS=true || SKIP_JETCORRS=false
+TASK_YEAR=$4
+$FRIENDS_ONLY && IN_TREES_DIR=$5
+[ "$6" == "--skip-jetCorrs" ] && SKIP_JETCORRS=true || SKIP_JETCORRS=false
 
 ## setup environment
 ! [ -z $CMSSW_BASE ] && CMSSW_DIR=$CMSSW_BASE/src || { echo "do cmsenv"; exit 1; }
@@ -41,8 +42,8 @@ py_FTREES=prepareEventVariablesFriendTree.py
 tthanalysis_macro_PATH=$CMSSW_DIR/CMGTools/TTHAnalysis/macros
 friends_dir=friends
 $FRIENDS_ONLY && friends_dir=friends-$(date | awk '{print $3$2$6}')
-N_EVENTS=25000 # 500000
-freq=2m
+N_EVENTS=100000 # 500000
+freq=10m
 
 ## clean existing working paths if the user allows
 ## Usage: checkRmPath <dir>
@@ -68,7 +69,7 @@ mkdir $IN_TREES_DIR/$friends_dir/jetmetUncertainties -p
 ## the postprocessor block won't run in case of the Friends Only mode
 if ! $FRIENDS_ONLY; then
     ## step1 condor submit the nanoAOD postprocessor
-    nanopy_batch.py -o $TASK_NAME $py_CFG --option year=2018 -B -b 'run_condor_simple.sh -t 1200 ./batchScript.sh' || \
+    nanopy_batch.py -o $TASK_NAME $py_CFG --option year=$YEAR -B -b 'run_condor_simple.sh -t 1200 ./batchScript.sh' || \
 	{ echo "nanopy_batch failed, returned $?";  exit 1; }
     printf "Submimtted tasks for 2018 from $py_CFG\nnanopy_batch returned $?\n"
 
@@ -95,7 +96,7 @@ function wait_friendsModule() {
 	jobs_logs=$(ls $DIR/logs/log.* | wc | awk '{print $1}')
 	jobs_finished=$(grep -o "return value 0" $DIR/logs/log.* | wc | awk '{print $1}')
 	root_files=$(ls $DIR/*.root | wc | awk '{print $1}')
-	echo "job_logs=$jobs_logs, jobs_finished=$jobs_finished, root_files=$root_files"
+	echo "jobs_logs=$jobs_logs, jobs_finished=$jobs_finished, root_files=$root_files"
 	echo "logs = finished : $(( $jobs_logs == $jobs_finished ))"
 	echo "logs = files    : $(( $jobs_logs == $root_files ))"
 	echo "logs > files    : $(( $jobs_logs > $root_files ))"
@@ -121,6 +122,7 @@ function wait_friendsModule() {
 function haddProcesses() {
     IN_DIR=$1
     OUT_DIR=$2
+    ## loop over processes which split into more than 1 chunk
     processes=$(ls $IN_DIR/*root | sed -r 's@^.*/([^/\.]*).*[Cc]hunk[0-9]*\.root$@\1@; /chunk/d' | sort -u)
     for process in $processes; do
 	chunks=$(ls $IN_DIR/$process.chunk*.root | wc | awk '{print $1}')
@@ -132,6 +134,11 @@ function haddProcesses() {
 	    echo "hadd failed for path $IN_DIR and process $process"
 	    return 1
 	}
+    done
+    ## copy the files from processes which split in 1 chunk
+    files=$(ls $IN_DIR/*root | sed -r 's@^.*/([^/\.]*).*[Cc]hunk[0-9]*\.root$@\1@' | grep .*root$)
+    for file in $files; do
+	cp -a $file $OUT_DIR/.
     done
     return 0
 }
@@ -147,7 +154,7 @@ if [ $TASK_TYPE == "data" ]; then
 
 elif [ $TASK_TYPE == "mc" ]; then
     ! $SKIP_JETCORRS && {
-	python $py_FTREES -t NanoAOD $IN_TREES_DIR $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks -D '^(?!.*Run).*' -I CMGTools.TTHAnalysis.tools.nanoAOD.susySOS_modules jetmetUncertainties2018 -N $N_EVENTS -q condor --maxruntime 240 --batch-name $TASK_NAME-mc_jetcorrs
+	python $py_FTREES -t NanoAOD $IN_TREES_DIR $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks -D '^(?!.*Run).*' -I CMGTools.TTHAnalysis.tools.nanoAOD.susySOS_modules jetmetUncertainties$TASK_YEAR -N $N_EVENTS -q condor --maxruntime 240 --batch-name $TASK_NAME-mc_jetcorrs
 
 	wait_friendsModule $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks \
 	    && haddProcesses $CMSSW_DIR/$TASK_NAME/jetmetUncertainties_chunks $IN_TREES_DIR/$friends_dir/jetmetUncertainties \
