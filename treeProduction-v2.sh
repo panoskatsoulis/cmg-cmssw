@@ -15,6 +15,7 @@ while ! [ -z "$1" ]; do
     [ "$1" == "--friends-only" ] && { FRIENDS_ONLY=true; shift; continue; }
     [ "$1" == "--skip-jetCorrs" ] && { SKIP_JETCORRS=true; shift; continue; }
     [ "$1" == "--debug" ] && { set -x; shift; continue; }
+    [ "$1" == "--force-rm" ] && { FORCE_RM_DIRS=true; shift; continue; }
     echo "Unsupported argument $1."
     exit 1
 done
@@ -27,6 +28,7 @@ done
 }
 [ -z "$FRIENDS_ONLY" ] && FRIENDS_ONLY=false
 [ -z "$SKIP_JETCORRS" ] && SKIP_JETCORRS=false
+[ -z "$FORCE_RM_DIRS" ] && FORCE_RM_DIRS=false
 [ -z "$N_EVENTS" ] && N_EVENTS=500000
 [ -z "$FREQ" ] && FREQ=10m
 { [ -z $PY_CFG ] && ! $FRIENDS_ONLY; } && {
@@ -47,8 +49,8 @@ TTHANALYSIS_MACRO_PATH=$CMSSW_DIR/CMGTools/TTHAnalysis/macros
 FRIENDS_DIR=friends
 
 ## clean existing working paths if the user allows
-checkRmPath $OUT_PATH
-checkRmPath $CMSSW_DIR/$TASK_NAME
+checkRmPath $OUT_PATH $FORCE_RM_DIRS
+checkRmPath $CMSSW_DIR/$TASK_NAME $FORCE_RM_DIRS
 
 ## setup the required directories
 mkdir $OUT_PATH/postprocessor_chunks -p

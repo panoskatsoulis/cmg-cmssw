@@ -15,6 +15,7 @@ Options:
     --skip-jetCorrs      : Skips the calculation of the jetMetCorrections,
                            needs to setup correctly the 'input' argument
                            {one (1) level above the jetmet directory}
+    --force-rm           : Forces to remove <out-dir> and <src/task_name> (if exist)
     --debug              : Runs 'set -x' (super verbosive)
 "
     [ "$1" == "all" ] && {
@@ -45,12 +46,14 @@ OUT_PATH/YEAR/TASK_NAME --+-- postprocessor_chunks
 
 
 ## tool that asks the user if wants to remove the given directory
-## Usage: checkRmPath <dir>
+## Usage: checkRmPath <dir> <force-bool>
 function checkRmPath() {
     DIR2RM=$1
+    FORCE=$2
+    $FORCE && { rm -rf $DIR2RM; return; }
     [ -e $DIR2RM ] && {
 	ans=''
-	while ! [[ $ans =~ [yn] ]]; do printf "The working path $DIR2RM exists, want to remove it? [y/n]"; read ans; done
+	while ! [[ $ans =~ [yn] ]]; do printf "The working path $DIR2RM exists, want to remove it? [y/n]"; read -p ans; done
 	[ "$ans" == "y" ] && rm -rf $DIR2RM
     }
     return
