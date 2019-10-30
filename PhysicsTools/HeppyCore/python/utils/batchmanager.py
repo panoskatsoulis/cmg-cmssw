@@ -93,11 +93,13 @@ class BatchManager:
                     print(self.remoteOutputDir_, "not valid")
                     sys.exit(1)
             else: # assume EOS
-                if not castortools.isLFN( self.remoteOutputDir_ ):
-                    print('When providing an output directory, you must give its LFN, starting by /store. You gave:')
-                    print(self.remoteOutputDir_)
-                    sys.exit(1)
-                self.remoteOutputDir_ = castortools.lfnToEOS( self.remoteOutputDir_ )
+                if not castortools.isEOS( self.remoteOutputDir_ ):
+                    ## if it's not EOS url then check if it's LFN and convert it
+                    if not castortools.isLFN( self.remoteOutputDir_ ):
+                        print('When providing an output directory, you must give its LFN, starting by /store. You gave:')
+                        print(self.remoteOutputDir_)
+                        sys.exit(1)
+                    self.remoteOutputDir_ = castortools.lfnToEOS( self.remoteOutputDir_ )
                 dirExist = castortools.isDirectory( self.remoteOutputDir_ )
                 # nsls = 'nsls %s > /dev/null' % self.remoteOutputDir_
                 # dirExist = os.system( nsls )

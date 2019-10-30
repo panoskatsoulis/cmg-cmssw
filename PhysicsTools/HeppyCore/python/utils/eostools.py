@@ -61,7 +61,7 @@ def isLFN( path ):
 
 def isEOS( path ):
     """Tests whether this path is a CMS EOS (name starts with /eos...)"""
-    return path.startswith('/eos') or path.startswith('root://eoscms.cern.ch//eos/cms')
+    return path.startswith('/eos') or path.startswith('root://eoscms.cern.ch//eos/cms') or path.startswith('root://eosuser.cern.ch//eos')
 
 def eosToLFN( path ):
     """Converts a EOS PFN to an LFN.

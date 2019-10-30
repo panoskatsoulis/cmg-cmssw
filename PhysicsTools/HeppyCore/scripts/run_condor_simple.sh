@@ -1,9 +1,14 @@
 #!/bin/bash
 
 if [[ "$1" == "--help" || "$1" == "-h"  || "$1" == "-?" ]]; then
-    echo "usage: $0 [ -f flavour | -t max_runtime_in_minutes ] script.sh "
+    echo "usage: $0 [ -f flavour | -t max_runtime_in_minutes ] script.sh [-batch-name batch-name]"
     exit 1;
 fi
+
+for ((i=0; i<$#; i++)); do
+    prev=$((i-1))
+    [ "${BASH_ARGV[$i]}" == "-batch-name" ] && batch_name=${BASH_ARGV[$prev]}
+done
 
 bulk=""
 if [[ "$1" == "--bulk" ]]; then
@@ -64,4 +69,6 @@ else
 fi;
 
 # Submit job
-/usr/bin/condor_submit $jobdesc
+[ -z "$bulk" ] && bulk=$batch_name
+echo "Will run /usr/bin/condor_submit $jobdesc -batch-name $bulk"
+/usr/bin/condor_submit $jobdesc -batch-name $bulk
